@@ -66,15 +66,17 @@ namespace HouseAutoClicker
         /// usually used to operate the game, as the "gamepad selection cursor" is not enabled by default under these circumstances.</param>
         private static void SendHousePurchase(IntPtr handle, bool first_run = false)
         {
-            SendKeyPress(handle, Keys.Up, 50);
-            SendKeyPress(handle, Keys.Up, 900);
+
+            SendKeyPress(handle, Settings.Instance.ConfirmKey, 50);
+            SendKeyPress(handle, Settings.Instance.ConfirmKey, 900);
             if (first_run)
-                SendKeyPress(handle, Keys.Up, 50);
-            SendKeyPress(handle, Keys.Up, 100);
-            SendKeyPress(handle, Keys.Left, 50);
-            SendKeyPress(handle, Keys.Up, 200);
-            SendKeyPress(handle, Keys.Right, 50);
-            SendKeyPress(handle, Keys.Up, 0);
+                SendKeyPress(handle, Settings.Instance.ConfirmKey, 50);
+            SendKeyPress(handle, Settings.Instance.ConfirmKey, 100);
+            if(!Settings.Instance.PurchaseSelfHouse) 
+                SendKeyPress(handle, Settings.Instance.DownKey, 50);
+            SendKeyPress(handle, Settings.Instance.ConfirmKey, 200);
+            SendKeyPress(handle, Settings.Instance.RightKey, 50);
+            SendKeyPress(handle, Settings.Instance.ConfirmKey, 0);
         }
 
         /// <summary>

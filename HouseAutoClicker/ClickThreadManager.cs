@@ -69,8 +69,16 @@ namespace HouseAutoClicker
                         ToggleSyncMode(input);
                         break;
 
+                    case "purchasefc":
+                        TogglePurchaseFC(input);
+                        break;
+
                     case "sanity":
                         PrintSanityCheck();
+                        break;
+
+                    default:
+                        Console.WriteLine("Unrecognized command. Use 'help' for valid syntax.");
                         break;
                 }
             }
@@ -82,7 +90,8 @@ namespace HouseAutoClicker
             if (processes.Length < id)
                 return;
 
-            threadStatus.Add(id, new ThreadStatus());
+            if (threadStatus.ContainsKey(id)) threadStatus[id] = new ThreadStatus();
+            else threadStatus.Add(id, new ThreadStatus());
             Thread t = new Thread(new ThreadStart(() => ClickThread.ThreadLoop(processes[id].MainWindowHandle, this.status, threadStatus[id], id)));
             t.Start();
             activeThreads.Add(id, t);
@@ -114,6 +123,7 @@ namespace HouseAutoClicker
             Console.WriteLine("stop [all/ID] - Stops the active clicker thread on the corresponding FFXIV process ID (or all)");
             Console.WriteLine("sync [on/off] - Turns clicker sync on or off - if turned on, threads will try to not overlap purchase attempts");
             Console.WriteLine("sanity - Gives the user a sanity check. Not recommended.");
+            Console.WriteLine("purchasefc [on/off] - If set to on, executes command to purchase an FC house. Otherwise house for own character (default).");
         }
 
         /// <summary>
@@ -227,6 +237,27 @@ namespace HouseAutoClicker
             else
             {
                 Console.WriteLine("Not recognized. Use 'sync [on/off]'.");
+            }
+        }
+
+        /// <summary>
+        /// Toggles "purchase FC house mode" on or off (purchasefc command in the console)
+        /// </summary>
+        /// <param name="input">The input provided in the console.</param>
+        public void TogglePurchaseFC(string input)
+        {
+            var onoff = input.Split(' ')[1];
+            if (onoff.ToLower().Equals("on"))
+            {
+                Settings.Instance.PurchaseSelfHouse = false;
+            }
+            else if (onoff.ToLower().Equals("off"))
+            {
+                Settings.Instance.PurchaseSelfHouse = true;
+            }
+            else
+            {
+                Console.WriteLine("Not recognized. Use 'purchasefc [on/off]'.");
             }
         }
 

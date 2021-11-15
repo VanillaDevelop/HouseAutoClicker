@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ClickThreadManager.cs" />
+    <Compile Include="Settings.cs" />
     <Compile Include="SynchronizedStatus.cs" />
     <Compile Include="ClickThread.cs" />
     <Compile Include="Program.cs" />
