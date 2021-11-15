@@ -21,32 +21,39 @@ namespace HouseAutoClicker
         #endregion
 
         #region methods
-        public static void ThreadLoop(IntPtr handle, SynchronizedStatus status, int threadId)
+        public static void ThreadLoop(IntPtr handle, SynchronizedStatus status, ThreadStatus tStatus, int threadId)
         {
             SendHousePurchase(handle, true);
             while (true)
             {
-                if(status.SyncMode)
+                //If sync mode is on, we set the following threshold:
+                //For N threads, There has to be at least RTT/2N ms between each call, where RTT is the time one request takes
+                //e.g., if it takes 2000 ms to do one request, the ideal distance between each request is 2000/N
+                //we set the minimum distance to half that, i.e. RTT/2N
+                //Additionally, threads can only operate in a fixed order set by the queue of the synchronized status.
+                if (status.SyncMode && status.GetNThreads() > 1)
                 {
-                    var timeSinceLastCall = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - status.LastThreadClick;
-                    //if it has been less than 500ms since another thread last started a purchase
-                    if(status.LastThreadId != threadId && timeSinceLastCall < 500)
-                    {
-                        //wait until we are offset by 1000ms from that threads call
-                        var delay = 1000 - timeSinceLastCall;
-                        //write this delay 
-                        lock (status)
-                        {
-                            status.LastThreadClick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + delay;
-                        }
-                        //do the delay
-                        Thread.Sleep((int)delay);
-                    }
-                    status.LastThreadId = threadId;
-                    status.LastThreadClick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                }
 
+                    while(!status.IsNextThread(threadId))
+                        Thread.Sleep(50);
+
+                    //When it's this threads turn to operate, make sure that it's been at least the threshold time since the last call
+                    long time_since_last_call = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - status.LastThreadClick;
+                    if(time_since_last_call < Utility.RTT / (2 * status.GetNThreads()))
+                    {
+                        //set an artificial delay such that delay + time_since_last_call = RTT/N, the ideal distance
+                        Thread.Sleep((int)((long)Math.Round((double)Utility.RTT / status.GetNThreads()) - time_since_last_call));
+                    }
+
+                    //Update the status
+                    lock (status)
+                    {
+                        status.LastThreadClick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                        status.UpdateQueue();
+                    }
+                }
                 SendHousePurchase(handle);
+                tStatus.Attempts++;
                 Thread.Sleep(r.Next(400, 550));
             }
         }

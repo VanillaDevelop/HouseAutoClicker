@@ -9,6 +9,13 @@ namespace HouseAutoClicker
 {
     class Utility
     {
+        #region properties
+        /// <summary>
+        /// Describes the rough time it takes for 1 function call in milliseconds 
+        /// </summary>
+        public const int RTT = 1750;
+        #endregion
+
         /// <summary>
         /// Returns all FFXIV Processes running on DX11 (denoted by the name ffxiv_dx11)
         /// </summary>

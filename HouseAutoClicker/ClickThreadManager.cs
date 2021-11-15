@@ -17,6 +17,8 @@ namespace HouseAutoClicker
         #region fields
         private volatile SynchronizedStatus status;
         private Dictionary<int, Thread> activeThreads;
+        private Dictionary<int, ThreadStatus> threadStatus;
+        private DateTime startTime;
         #endregion
 
         #region ctor
@@ -27,6 +29,8 @@ namespace HouseAutoClicker
         {
             activeThreads = new Dictionary<int, Thread>();
             status = new SynchronizedStatus(0, -1);
+            this.startTime = DateTime.UtcNow;
+            threadStatus = new Dictionary<int, ThreadStatus>();
         }
         #endregion
 
@@ -64,28 +68,36 @@ namespace HouseAutoClicker
                     case "sync":
                         ToggleSyncMode(input);
                         break;
+
+                    case "sanity":
+                        PrintSanityCheck();
+                        break;
                 }
             }
         }
 
-        public Thread StartThread(int id)
+        public void StartThread(int id)
         {
             var processes = Utility.GetAllXivProcesses();
             if (processes.Length < id)
-                return null;
-            else
-            {
-                Thread t = new Thread(new ThreadStart(() => ClickThread.ThreadLoop(processes[id].MainWindowHandle, this.status, id)));
-                t.Start();
-                return t;
-            }
+                return;
+
+            threadStatus.Add(id, new ThreadStatus());
+            Thread t = new Thread(new ThreadStart(() => ClickThread.ThreadLoop(processes[id].MainWindowHandle, this.status, threadStatus[id], id)));
+            t.Start();
+            activeThreads.Add(id, t);
+            status.AddThreadToQueue(id);
         }
 
-        public void StopThread(int id)
+        public void StopThread(int id, bool delete_from_list = true)
         {
             if(activeThreads.ContainsKey(id))
-            {
+            { 
                 activeThreads[id].Abort();
+                status.RemoveThreadFromQueue(id);
+                threadStatus[id].DeactivateThread();
+                if (delete_from_list)
+                    activeThreads.Remove(id);
             }
         }
 
@@ -101,6 +113,7 @@ namespace HouseAutoClicker
             Console.WriteLine("start [all/ID] - Starts a clicker thread on the corresponding FFXIV process ID (or all)");
             Console.WriteLine("stop [all/ID] - Stops the active clicker thread on the corresponding FFXIV process ID (or all)");
             Console.WriteLine("sync [on/off] - Turns clicker sync on or off - if turned on, threads will try to not overlap purchase attempts");
+            Console.WriteLine("sanity - Gives the user a sanity check. Not recommended.");
         }
 
         /// <summary>
@@ -118,11 +131,7 @@ namespace HouseAutoClicker
                     for (int i = 0; i < processes.Length; i++)
                     {
                         if (!activeThreads.ContainsKey(i))
-                        {
-                            Thread t = StartThread(i);
-                            if (t != null)
-                                activeThreads.Add(i, t);
-                        }
+                            StartThread(i);
                     }
                     return;
                 }
@@ -133,11 +142,7 @@ namespace HouseAutoClicker
                 else if (id >= processes.Length || id < 0)
                     Console.WriteLine("Process ID does not exist. See available processes with 'list'.");
                 else
-                {
-                    Thread t = StartThread(id);
-                    if (t != null)
-                        activeThreads.Add(id, t);
-                }
+                    StartThread(id);
             }
             catch
             {
@@ -156,9 +161,8 @@ namespace HouseAutoClicker
                 if (input.Split(' ')[1].ToLower().Equals("all"))
                 {
                     foreach (var kvp in activeThreads)
-                    {
-                        StopThread(kvp.Key);
-                    }
+                        StopThread(kvp.Key, false);
+
                     activeThreads.Clear();
                     return;
                 }
@@ -167,10 +171,7 @@ namespace HouseAutoClicker
                 if (!activeThreads.ContainsKey(id))
                     Console.WriteLine("No thread with this id is running.");
                 else
-                {
                     StopThread(id);
-                    activeThreads.Remove(id);
-                }
             }
             catch
             {
@@ -227,6 +228,28 @@ namespace HouseAutoClicker
             {
                 Console.WriteLine("Not recognized. Use 'sync [on/off]'.");
             }
+        }
+
+        /// <summary>
+        /// Prints a "sanity check" (usage statistic) to the console. (sanity command in the console)
+        /// </summary>
+        public void PrintSanityCheck()
+        {
+            Console.WriteLine("######################## SANITY CHECK ########################");
+            Console.WriteLine("The House Auto Clicker has been running since " + startTime + " UTC");
+            Console.WriteLine("The following thread statuses were found:");
+            if (threadStatus.Count > 0)
+            {
+                foreach (var kvp in threadStatus)
+                {
+                    Console.WriteLine("ID: " + kvp.Key);
+                    Console.WriteLine("Current Status: " + (kvp.Value.ThreadActive ? "Active" : "Inactive"));
+                    Console.WriteLine("This Thread was started at " + kvp.Value.StartTime + " UTC and has made " + kvp.Value.Attempts +
+                        " attempts to purchase a house.");
+                }
+            }
+            else
+                Console.WriteLine("No clicker threads have been run yet.");
         }
         #endregion
     }
