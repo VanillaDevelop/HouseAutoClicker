@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,9 +16,8 @@ namespace HouseAutoClicker
     class ClickThreadManager
     {
         #region fields
-        private volatile SynchronizedStatus status;
         private Dictionary<int, Thread> activeThreads;
-        private Dictionary<int, ThreadStatus> threadStatus;
+        private Dictionary<int, ThreadStatistics> threadStatus;
         private DateTime startTime;
         #endregion
 
@@ -28,13 +28,15 @@ namespace HouseAutoClicker
         public ClickThreadManager()
         {
             activeThreads = new Dictionary<int, Thread>();
-            status = new SynchronizedStatus(0, -1);
             this.startTime = DateTime.UtcNow;
-            threadStatus = new Dictionary<int, ThreadStatus>();
+            threadStatus = new Dictionary<int, ThreadStatistics>();
         }
         #endregion
 
-        #region methods
+        #region activeloop
+        /// <summary>
+        /// The active loop of the main thread which allows for user input.
+        /// </summary>
         public void ActiveLoop()
         {
             Console.WriteLine("#################################################");
@@ -61,8 +63,8 @@ namespace HouseAutoClicker
                         ProcessStop(input);
                         break;
 
-                    case "list":
-                        ListProcesses();
+                    case "info":
+                        ListInfo();
                         break;
 
                     case "sync":
@@ -71,6 +73,10 @@ namespace HouseAutoClicker
 
                     case "purchasefc":
                         TogglePurchaseFC(input);
+                        break;
+
+                    case "randomdelay":
+                        ToggleRandomDelay(input);
                         break;
 
                     case "sanity":
@@ -83,34 +89,57 @@ namespace HouseAutoClicker
                 }
             }
         }
+        #endregion
 
+        #region methods
+        /// <summary>
+        /// Starts a thread on the given index XIV client
+        /// </summary>
+        /// <param name="id">The index of the XIV client when listing the processes to which to attach the thread to.</param>
         public void StartThread(int id)
         {
-            var processes = Utility.GetAllXivProcesses();
+            var processes = GetAllXivProcesses();
             if (processes.Length < id)
                 return;
 
-            if (threadStatus.ContainsKey(id)) threadStatus[id] = new ThreadStatus();
-            else threadStatus.Add(id, new ThreadStatus());
-            Thread t = new Thread(new ThreadStart(() => ClickThread.ThreadLoop(processes[id].MainWindowHandle, this.status, threadStatus[id], id)));
+            if (!threadStatus.ContainsKey(id)) threadStatus.Add(id, new ThreadStatistics());
+            Thread t = new Thread(new ThreadStart(() => ClickThread.ThreadLoop(processes[id].MainWindowHandle, threadStatus[id], id)));
             t.Start();
             activeThreads.Add(id, t);
-            status.AddThreadToQueue(id);
+            SynchronizedStatus.Instance.AddThreadToQueue(id);
         }
 
+        /// <summary>
+        /// Stops a thread on the given index XIV client
+        /// </summary>
+        /// <param name="id">The index of the XIV client when listing the processes to which the thread is attached to.</param>
+        /// <param name="delete_from_list">Whether or not to remove the thread from the list of active threads</param>
         public void StopThread(int id, bool delete_from_list = true)
         {
             if(activeThreads.ContainsKey(id))
             { 
                 activeThreads[id].Abort();
-                status.RemoveThreadFromQueue(id);
+                SynchronizedStatus.Instance.RemoveThreadFromQueue(id);
                 threadStatus[id].DeactivateThread();
                 if (delete_from_list)
                     activeThreads.Remove(id);
             }
         }
 
+        /// <summary>
+        /// Returns all FFXIV Processes running on DX11 (denoted by the name ffxiv_dx11)
+        /// Processes are sorted by start time
+        /// </summary>
+        /// <returns>A list of processes with names matching "ffxiv_dx11"</returns>
+        public static Process[] GetAllXivProcesses()
+        {
+            return Process.GetProcessesByName("ffxiv_dx11").OrderBy(x => x.StartTime).ToArray();
+        }
+        #endregion
+
+        #region console_handlers
         //=================== METHODS FOR PROCESSING CONSOLE COMMANDS ===================
+
         /// <summary>
         /// Prints help (help command in the console)
         /// </summary>
@@ -118,12 +147,13 @@ namespace HouseAutoClicker
         {
             Console.WriteLine("======================== COMMANDS ========================");
             Console.WriteLine("help - Shows this menu");
-            Console.WriteLine("list - Lists all currently running FFXIV processes and clicker threads");
+            Console.WriteLine("info - Lists all currently running FFXIV processes and clicker threads as well as the current settings.");
             Console.WriteLine("start [all/ID] - Starts a clicker thread on the corresponding FFXIV process ID (or all)");
             Console.WriteLine("stop [all/ID] - Stops the active clicker thread on the corresponding FFXIV process ID (or all)");
             Console.WriteLine("sync [on/off] - Turns clicker sync on or off - if turned on, threads will try to not overlap purchase attempts");
-            Console.WriteLine("sanity - Gives the user a sanity check. Not recommended.");
+            Console.WriteLine("randomdelay [on/off] - Toggles a small random delay after each iteration. Might avoid bot detection but probably does nothing.");
             Console.WriteLine("purchasefc [on/off] - If set to on, executes command to purchase an FC house. Otherwise house for own character (default).");
+            Console.WriteLine("sanity - Gives the user a sanity check. Not recommended.");
         }
 
         /// <summary>
@@ -132,7 +162,7 @@ namespace HouseAutoClicker
         /// <param name="input">The input provided in the console</param>
         public void ProcessStart(string input)
         {
-            var processes  = Utility.GetAllXivProcesses();
+            var processes  = GetAllXivProcesses();
 
             try
             {
@@ -190,11 +220,11 @@ namespace HouseAutoClicker
         }
 
         /// <summary>
-        /// Lists all currently running FFXIV processes and clicker threads (list command in the console)
+        /// Lists all currently running FFXIV processes, settings, and clicker threads (info command in the console)
         /// </summary>
-        public void ListProcesses()
+        public void ListInfo()
         {
-            var processes = Utility.GetAllXivProcesses();
+            var processes = GetAllXivProcesses();
             Console.WriteLine("FFXIV Processes:");
             if (processes.Length > 0)
             {
@@ -217,6 +247,11 @@ namespace HouseAutoClicker
             }
             else
                 Console.WriteLine("None");
+
+            Console.WriteLine("Current Settings:");
+            Console.WriteLine("Sync Mode - " + (Settings.Instance.SyncMode ? "On" : "Off"));
+            Console.WriteLine("Purchase Mode - " + (Settings.Instance.PurchaseSelfHouse ? "Personal" : "Free Company"));
+            Console.WriteLine("Random Delay - " + (Settings.Instance.RandomDelay ? "On" : "Off"));
         }
 
         /// <summary>
@@ -228,11 +263,11 @@ namespace HouseAutoClicker
             var onoff = input.Split(' ')[1];
             if (onoff.ToLower().Equals("on"))
             {
-                status.SyncMode = true;
+                Settings.Instance.SyncMode = true;
             }
             else if(onoff.ToLower().Equals("off"))
             {
-                status.SyncMode = false;
+                Settings.Instance.SyncMode = false;
             }
             else
             {
@@ -262,6 +297,27 @@ namespace HouseAutoClicker
         }
 
         /// <summary>
+        /// Toggles random delay on or off (randomdelay command in the console)
+        /// </summary>
+        /// <param name="input">The input provided in the console.</param>
+        public void ToggleRandomDelay(string input)
+        {
+            var onoff = input.Split(' ')[1];
+            if (onoff.ToLower().Equals("on"))
+            {
+                Settings.Instance.RandomDelay = true;
+            }
+            else if (onoff.ToLower().Equals("off"))
+            {
+                Settings.Instance.RandomDelay = false;
+            }
+            else
+            {
+                Console.WriteLine("Not recognized. Use 'randomdelay [on/off]'.");
+            }
+        }
+
+        /// <summary>
         /// Prints a "sanity check" (usage statistic) to the console. (sanity command in the console)
         /// </summary>
         public void PrintSanityCheck()
@@ -275,8 +331,17 @@ namespace HouseAutoClicker
                 {
                     Console.WriteLine("ID: " + kvp.Key);
                     Console.WriteLine("Current Status: " + (kvp.Value.ThreadActive ? "Active" : "Inactive"));
-                    Console.WriteLine("This Thread was started at " + kvp.Value.StartTime + " UTC and has made " + kvp.Value.Attempts +
+                    if (kvp.Value.ThreadActive)
+                    {
+                        Console.WriteLine("The current thread was started at " + kvp.Value.StartTime + " UTC and has made " + kvp.Value.CurrentAttempts +
                         " attempts to purchase a house.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("The last thread on this client stopped at " + kvp.Value.EndTime + " UTC and made " + kvp.Value.CurrentAttempts + 
+                            " attempts to purchase a house.");
+                    }
+                    Console.WriteLine("In total, there was " + kvp.Value.TotalAttempts + " attempts to purchase a house on this client.\n");
                 }
             }
             else

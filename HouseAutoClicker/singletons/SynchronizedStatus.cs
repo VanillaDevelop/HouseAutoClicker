@@ -7,11 +7,16 @@ using System.Threading.Tasks;
 namespace HouseAutoClicker
 {
     /// <summary>
-    /// Model class to hold current status for thread synchronization
+    /// Singleton class to hold current status for thread synchronization
     /// </summary>
-    class SynchronizedStatus
+    sealed class SynchronizedStatus
     {
         #region fields
+        /// <summary>
+        /// singleton holder
+        /// </summary>
+        private static SynchronizedStatus instance = null;
+
         /// <summary>
         /// Queue for determining which thread may send a purchase request next in Sync Mode
         /// </summary>
@@ -27,21 +32,26 @@ namespace HouseAutoClicker
         /// The ID of the thread which last started a purchase event
         /// </summary>
         public int LastThreadId { get; private set; }
-        /// <summary>
-        /// The number of currently running threads
-        /// </summary>
-        public bool SyncMode { get; set; }
+
+        public static SynchronizedStatus Instance
+        {
+            get
+            {
+                if (instance == null)
+                    instance = new SynchronizedStatus();
+                return instance;
+            }
+        }
         #endregion
 
         #region ctor
         /// <summary>
         /// Initialize the ThreadStatus
         /// </summary>
-        public SynchronizedStatus(long lastThreadClick, int lastThreadId)
+        private SynchronizedStatus()
         {
             this.LastThreadId = -1;
             this.LastThreadClick = 0;
-            this.SyncMode = false;
             this.syncModeQueue = new Queue<int>();
         }
         #endregion
@@ -94,6 +104,7 @@ namespace HouseAutoClicker
             var lastThreadId = syncModeQueue.Dequeue();
             this.LastThreadId = LastThreadId;
             syncModeQueue.Enqueue(lastThreadId);
+            this.LastThreadClick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         }
 
         /// <summary>
@@ -103,6 +114,13 @@ namespace HouseAutoClicker
         public int GetNThreads()
         {
             return syncModeQueue.Count;
+        }
+
+        /// <summary>
+        /// Signifies that a thread has started a purchase attempt
+        /// </summary>
+        public void UpdateThreadClick()
+        {
         }
     #endregion
 }

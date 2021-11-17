@@ -8,7 +8,7 @@ using System.Windows.Forms;
 namespace HouseAutoClicker
 {
     /// <summary>
-    /// Singleton class which stores settings
+    /// Singleton class which stores application wide settings that may change during runtime.
     /// </summary>
     public sealed class Settings
     {
@@ -36,31 +36,26 @@ namespace HouseAutoClicker
         }
 
         /// <summary>
-        /// Key for confirming or selecting a prompt option in FFXIV
-        /// </summary>
-        public Keys ConfirmKey { get; set; }
-        /// <summary>
-        /// Key for moving an option to the right in FFXIV
-        /// </summary>
-        public Keys RightKey { get; set; }
-        /// <summary>
-        /// Key for moving an option down in FFXIV
-        /// </summary>
-        public Keys DownKey { get; set; }
-        /// <summary>
-        /// Boolean whether or not the house is a self purchase or an FC purchase.
+        /// Whether or not the current purchase attempt is made for a personal house or an FC house.
         /// </summary>
         public bool PurchaseSelfHouse { get; set; }
+        /// <summary>
+        /// Whether or not to add a random delay after 
+        /// </summary>
+        public bool RandomDelay { get; set; }
+        /// <summary>
+        /// Whether or not threads will alternate and space out making requests, or just go at will.
+        /// </summary>
+        public bool SyncMode { get; set; }
         #endregion
 
         #region ctor
         private Settings()
         {
             //initialize default settings
-            ConfirmKey = Keys.NumPad0;
-            RightKey = Keys.NumPad6;
-            DownKey = Keys.NumPad2;
             PurchaseSelfHouse = true;
+            RandomDelay = true;
+            SyncMode = false;
         }
         #endregion
     }

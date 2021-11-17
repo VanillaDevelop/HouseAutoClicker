@@ -45,13 +45,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ClickThreadManager.cs" />
-    <Compile Include="Settings.cs" />
-    <Compile Include="SynchronizedStatus.cs" />
+    <Compile Include="models\KeyPress.cs" />
+    <Compile Include="models\KeyPressSequence.cs" />
+    <Compile Include="singletons\Settings.cs" />
+    <Compile Include="singletons\SynchronizedStatus.cs" />
     <Compile Include="ClickThread.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ThreadStatus.cs" />
-    <Compile Include="Utility.cs" />
+    <Compile Include="ThreadStatistics.cs" />
+    <Compile Include="ConstantData.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
